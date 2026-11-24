@@ -1,0 +1,36 @@
+name: Pull Docker Image to Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: 'onlyoffice/documentserver:9.4.0'
+        required: true
+        default: 'onlyoffice/documentserver:9.4.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Pull and Compress Docker Image
+        run: |
+          IMAGE="${{ github.event.inputs.image }}"
+          # 将镜像名中的 / 和 : 替换为 - 作为文件名
+          FILE_NAME=$(echo "$IMAGE" | sed 's/[\/:]/-/g').tar.gz
+
+          echo "正在拉取镜像: $IMAGE"
+          docker pull "$IMAGE"
+
+          echo "正在打包并压缩为: $FILE_NAME"
+          docker save "$IMAGE" | gzip > "$FILE_NAME"
+
+          echo "FILE_NAME=$FILE_NAME" >> $GITHUB_ENV
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v-${{ github.run_number }}
+          name: Mirror ${{ github.event.inputs.image }}
+          files: ${{ env.FILE_NAME }}
